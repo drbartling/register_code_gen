@@ -139,6 +139,7 @@ def write_peripheral(output: OutputStructure, peripheral: Peripheral):
     p_out.header.open("w", encoding="utf-8")
     write_peripheral_header(p_out, peripheral)
     write_peripheral_registers(p_out, peripheral)
+    write_peripheral_struct(p_out, peripheral)
     write_peripheral_footer(p_out, peripheral)
 
 
@@ -201,9 +202,63 @@ def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
         write_register(output, r)
 
 
+def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
+    type_name = f"{peripheral.name.upper()}_peripheral_registers_t"
+    with output.header.open("a", encoding="utf-8") as f:
+        f.write(f"/** {peripheral.description} */\n")
+        f.write("typedef struct {\n")
+
+        addressed_registers = dict()
+        for register in peripheral.registers:
+            try:
+                addressed_registers[register.addressOffset].append(register)
+            except KeyError:
+                addressed_registers[register.addressOffset] = list([register])
+
+        current_offset = 0
+        for address in sorted(list(addressed_registers.keys())):
+            if current_offset < address:
+                reserved_bytes = int(address - current_offset)
+                f.write(
+                    f"uint8_t const reserved_0x{current_offset:02X}[{reserved_bytes}];\n"
+                )
+                current_offset += reserved_bytes
+            registers = addressed_registers[address]
+            if 1 < len(registers):
+                f.write("union{\n")
+
+            for register in sorted(
+                registers, key=lambda register: register.name
+            ):
+                reg_name: str = register_name(register)
+                reg_type = (
+                    f"{register.parent.name.upper()}_{reg_name.lower()}_t"
+                )
+                f.write(f"{reg_type} volatile {reg_name.lower()};\n")
+                current_offset = register.addressOffset + int(register.size / 8)
+
+            if 1 < len(registers):
+                f.write("};\n")
+        f.write(f"}} {type_name};\n")
+        for register in sorted(
+            peripheral.registers, key=lambda register: register.addressOffset
+        ):
+            reg_name: str = register_name(register)
+            f.write(
+                f"STATIC_ASSERT_MEMBER_OFFSET({type_name}, {reg_name.lower()}, 0x{register.addressOffset:02X});\n"
+            )
+
+        f.write(f"\n")
+
+
+def register_name(register: Register):
+    name: str = register.name
+    name = name.replace(f"{register.parent.name}_", "", 1)
+    return name
+
+
 def write_register(output: OutputStructure, register: Register):
-    register_name: str = register.name
-    register_name = register_name.replace(f"{register.parent.name}_", "", 1)
+    reg_name: str = register_name(register)
     with output.header.open("a", encoding="utf-8") as f:
         f.write("typedef union {\n")
         f.write("struct {\n")
@@ -228,7 +283,7 @@ def write_register(output: OutputStructure, register: Register):
 
         f.write("};\n")
         f.write(f"uint{register.size}_t bits;\n")
-        type_name = f"{register.parent.name.upper()}_{register_name.lower()}_t"
+        type_name = f"{register.parent.name.upper()}_{reg_name.lower()}_t"
         f.write(f"}} {type_name};\n")
         f.write(
             f"STATIC_ASSERT_TYPE_SIZE({type_name}, sizeof(uint{register.size}_t));\n"
@@ -239,7 +294,7 @@ def write_register(output: OutputStructure, register: Register):
 def write_field(f, field: Field):
     size = field.parent.size
     const = "const" if str(field.access) == "read-only" else ""
-    # f.write(f"///{field.description}\n")
+    f.write(f"///{field.description}\n")
     f.write(f"uint{size}_t {const} {field.name.lower()}:{field.bitWidth};\n")
 
 
