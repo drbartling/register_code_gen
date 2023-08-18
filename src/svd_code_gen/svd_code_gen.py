@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import click
 import pysvd
-from pysvd.element import Device, Peripheral
+from pysvd.element import Device, Field, Peripheral, Register
 
 
 @click.command()
@@ -138,6 +138,7 @@ def write_peripheral(output: OutputStructure, peripheral: Peripheral):
     p_out.header.parent.mkdir(parents=True, exist_ok=True)
     p_out.header.open("w", encoding="utf-8")
     write_peripheral_header(p_out, peripheral)
+    write_peripheral_registers(p_out, peripheral)
     write_peripheral_footer(p_out, peripheral)
 
 
@@ -179,6 +180,10 @@ def write_peripheral_header(
         f.write('extern "C" {\n')
         f.write("#endif\n")
         f.write("\n")
+        f.write('#include "static_assert.h"\n')
+        f.write("\n")
+        f.write("#include <stdint.h>\n")
+        f.write("\n")
 
 
 def write_peripheral_footer(output: OutputStructure, peripheral: Peripheral):
@@ -187,6 +192,59 @@ def write_peripheral_footer(output: OutputStructure, peripheral: Peripheral):
         f.write("}\n")
         f.write("#endif\n")
         f.write(f"#endif // {peripheral.name}_H_\n")
+
+
+def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
+    for r in sorted(
+        peripheral.registers, key=lambda register: register.addressOffset
+    ):
+        write_register(output, r)
+
+
+def write_register(output: OutputStructure, register: Register):
+    register_name: str = register.name
+    register_name = register_name.replace(f"{register.parent.name}_", "", 1)
+    with output.header.open("a", encoding="utf-8") as f:
+        f.write("typedef union {\n")
+        f.write("struct {\n")
+
+        current_offset = 0
+        for field in sorted(
+            register.fields, key=lambda register: register.bitOffset
+        ):
+            if current_offset < field.bitOffset:
+                reserved_offset = current_offset
+                reserved_width = field.bitOffset - reserved_offset
+                write_reserved(
+                    f, register.size, reserved_offset, reserved_width
+                )
+                current_offset = reserved_offset + reserved_width
+            write_field(f, field)
+            current_offset = field.bitOffset + field.bitWidth
+        if current_offset < 32:
+            reserved_offset = current_offset
+            reserved_width = 32 - reserved_offset
+            write_reserved(f, register.size, reserved_offset, reserved_width)
+
+        f.write("};\n")
+        f.write(f"uint{register.size}_t bits;\n")
+        type_name = f"{register.parent.name.upper()}_{register_name.lower()}_t"
+        f.write(f"}} {type_name};\n")
+        f.write(
+            f"STATIC_ASSERT_TYPE_SIZE({type_name}, sizeof(uint{register.size}_t));\n"
+        )
+        f.write("\n")
+
+
+def write_field(f, field: Field):
+    size = field.parent.size
+    const = "const" if str(field.access) == "read-only" else ""
+    # f.write(f"///{field.description}\n")
+    f.write(f"uint{size}_t {const} {field.name.lower()}:{field.bitWidth};\n")
+
+
+def write_reserved(f, reg_size, offset, width):
+    f.write(f"uint{reg_size}_t const reserved_{offset:02}:{width};\n")
 
 
 if __name__ == "__main__":  # pragma: no cover
