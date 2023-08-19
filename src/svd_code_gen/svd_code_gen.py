@@ -296,7 +296,8 @@ def register_name(register: Register):
     return name
 
 
-def write_register(output: OutputStructure, register: Register):
+def write_register(output: PeripheralOutputStructure, register: Register):
+    write_enums(output, register)
     reg_name: str = register_name(register)
     with output.header.open("a", encoding="utf-8") as f:
         f.write("typedef union {\n")
@@ -315,7 +316,7 @@ def write_register(output: OutputStructure, register: Register):
                 current_offset = reserved_offset + reserved_width
             write_field(f, field)
             current_offset = field.bitOffset + field.bitWidth
-        if current_offset < 32:
+        if current_offset < 32 and False:
             reserved_offset = current_offset
             reserved_width = 32 - reserved_offset
             write_reserved(f, register.size, reserved_offset, reserved_width)
@@ -330,11 +331,61 @@ def write_register(output: OutputStructure, register: Register):
         f.write("\n")
 
 
+written_enums = set()
+
+
+def write_enums(output: PeripheralOutputStructure, register: Register):
+    peripheral_name = register.parent.name
+    global written_enums
+
+    with output.header.open("a", encoding="utf-8") as f:
+        for field in sorted(
+            register.fields, key=lambda register: register.bitOffset
+        ):
+            try:
+                field_enum = field.enumeratedValues
+            except AttributeError:
+                continue
+
+            field_name = f"{peripheral_name}_{field.name.lower()}"
+            enum_type = f"{field_name}_t"
+
+            if enum_type in written_enums:
+                continue
+            written_enums.add(enum_type)
+
+            f.write(f"/// {field.description}\n")
+            f.write("typedef enum {\n")
+            width = str(int(field.bitWidth / 4) + 1)
+
+            for enum_value in field_enum.enumeratedValues:
+                value = f"0x{enum_value.value:0{width}X}"
+                desc = enum_value.description
+                name = enum_value.name.lower()
+                f.write(f"///{desc}\n")
+                f.write(f"{field_name}_{name} = {value},\n")
+            f.write(f"}}{enum_type};\n")
+            f.write(f"\n")
+
+
 def write_field(f, field: Field):
-    size = field.parent.size
+    if field.derivedFrom is not None:
+        type_field = field.derivedFrom
+    else:
+        type_field = field
+
+    try:
+        type_field.enumeratedValues
+        peripheral_name = type_field.parent.parent.name
+        field_name = f"{peripheral_name}_{type_field.name.lower()}"
+        field_type = f"{field_name}_t"
+    except AttributeError:
+        size = type_field.parent.size
+        field_type = f"uint{size}_t"
+
     const = "const" if str(field.access) == "read-only" else ""
     f.write(f"///{field.description}\n")
-    f.write(f"uint{size}_t {const} {field.name.lower()}:{field.bitWidth};\n")
+    f.write(f"{field_type} {const} {field.name.lower()}:{field.bitWidth};\n")
 
 
 def write_reserved(f, reg_size, offset, width):
