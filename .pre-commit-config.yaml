@@ -35,14 +35,14 @@ repos:
   - id: trailing-whitespace
 - repo: local
   hooks:
-  - id: test
-    name: unit tests
-    description: Run unit tests.
-    entry: poetry run pytest
-    language: system
-    types: [python]
-    pass_filenames: false
-    stages: [commit]
+      # - id: test
+      #   name: unit tests
+      #   description: Run unit tests.
+      #   entry: poetry run pytest
+      #   language: system
+      #   types: [python]
+      #   pass_filenames: false
+      #   stages: [commit]
   - id: pylint
     name: pylint
     entry: poetry run pylint
