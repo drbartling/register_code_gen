@@ -41,8 +41,11 @@ def main(svd_input, output_dir):  # pragma: no cover
     output = OutputStructure(output_dir, device)
     output.main_header.parent.mkdir(parents=True, exist_ok=True)
     output.main_header.open("w", encoding="utf-8")
+    output.main_source.parent.mkdir(parents=True, exist_ok=True)
+    output.main_source.open("w", encoding="utf-8")
     write_header(output, device)
     write_peripherals(output, device)
+    write_main_source(output, device)
     write_footer(output, device)
 
 
@@ -56,12 +59,20 @@ class OutputStructure:
         return self.output_root / "src"
 
     @property
+    def include_root(self) -> Path:
+        return self.output_root / "include"
+
+    @property
     def include_dir(self) -> Path:
-        return self.output_root / "include" / self.device.name.lower()
+        return self.include_root / self.device.name.lower()
 
     @property
     def main_header(self) -> Path:
         return self.include_dir / f"{self.device.name.lower()}.h"
+
+    @property
+    def main_source(self) -> Path:
+        return self.src_dir / f"{self.device.name.lower()}.c"
 
 
 def write_header(output: OutputStructure, device: Device):
@@ -97,6 +108,27 @@ def write_header(output: OutputStructure, device: Device):
         f.write("\n")
 
 
+def write_main_source(output: OutputStructure, device: Device):
+    include_path = output.main_header.relative_to(output.include_root)
+    with output.main_header.open("a", encoding="utf-8") as h:
+        with output.main_source.open("a", encoding="utf-8") as c:
+            c.write(f'#include "{include_path}"\n\n')
+            for peripheral in sorted(
+                device.peripherals,
+                key=lambda peripheral: peripheral.baseAddress,
+            ):
+                type_name = (
+                    f"{peripheral.name.upper()}_peripheral_registers_t"
+                    if peripheral.derivedFrom is None
+                    else f"{peripheral.derivedFrom.name.upper()}_peripheral_registers_t"
+                )
+                c.write(
+                    f"{type_name} * {peripheral.name.upper()} = (void *) (0x{peripheral.baseAddress:08X}UL);\n"
+                )
+                h.write(f"extern {type_name} * {peripheral.name.upper()};\n")
+            h.write("\n")
+
+
 def write_footer(output: OutputStructure, device: Device):
     with output.main_header.open("a", encoding="utf-8") as f:
         f.write("#ifdef __cplusplus\n")
@@ -110,8 +142,11 @@ def write_peripherals(output: OutputStructure, device: Device):
         for p in sorted(
             device.peripherals, key=lambda peripheral: peripheral.name
         ):
-            f.write(f'#include "{p.name.lower()}.h"\n')
-            write_peripheral(output, p)
+            if p.derivedFrom is None:
+                include_path = output.include_dir / f"{p.name.lower()}.h"
+                include_path = include_path.relative_to(output.include_root)
+                f.write(f'#include "{include_path}"\n')
+                write_peripheral(output, p)
         f.write("\n")
 
 
@@ -125,12 +160,16 @@ class PeripheralOutputStructure:
         return self.output_root / "src"
 
     @property
+    def include_root(self) -> Path:
+        return self.output_root / "include"
+
+    @property
     def include_dir(self) -> Path:
-        return self.output_root / "include" / self.device.name.lower()
+        return self.include_root / self.peripheral.parent.name.lower()
 
     @property
     def header(self) -> Path:
-        return self.src_dir / f"{self.peripheral.name.lower()}.h"
+        return self.include_dir / f"{self.peripheral.name.lower()}.h"
 
 
 def write_peripheral(output: OutputStructure, peripheral: Peripheral):
