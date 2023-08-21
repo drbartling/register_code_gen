@@ -29,7 +29,7 @@ show_missing = true
 [tool.coverage.run]
 branch = true
 parallel = true
-source = ["svd_code_gen"]
+source = ["register_code_gen"]
 
 [tool.isort]
 line_length = 80
@@ -39,9 +39,9 @@ profile = "black"
 authors = ["Ryan Bartling <ryan.bartling@gmail.com>"]
 description = "Python application template"
 include = ["README.md", "pyproject.toml"]
-name = "svd-code-gen"
+name = "register-code-gen"
 readme = "README.md"
-repository = "https://github.com/drbartling/svd_code_gen"
+repository = "https://github.com/drbartling/register_code_gen"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
@@ -61,7 +61,7 @@ pytest = "^7.2.2"
 pytest-cov = "^4.0.0"
 
 [tool.poetry.scripts]
-svd-code-gen = "svd_code_gen.svd_code_gen:main"
+register-code-gen = "register_code_gen.register_code_gen:main"
 
 [tool.pylint.basic]
 argument-rgx = '^([a-z_][a-z0-9]*)((_([a-z0-9]+|[A-Z0-9]+))*)?$'

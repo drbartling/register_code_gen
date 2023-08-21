@@ -9,8 +9,8 @@ from pysvd.element import Device, Field, Peripheral, Register
 
 @click.command()
 @click.option(
-    "-s",
-    "--svd-input",
+    "-i",
+    "--input-file",
     prompt=True,
     type=click.Path(
         exists=True,
@@ -32,9 +32,9 @@ from pysvd.element import Device, Field, Peripheral, Register
         path_type=Path,
     ),
 )
-def main(svd_input, output_dir):  # pragma: no cover
+def main(input_file, output_dir):  # pragma: no cover
     """Generate C header and dir from CMSIS-SVD which is often used to provide register descriptions for microcontrollers"""
-    node = ElementTree.parse(svd_input).getroot()
+    node = ElementTree.parse(input_file).getroot()
     device = Device(node)
     if output_dir is None:
         output_dir = Path(device.name.lower())  # pylint: disable=no-member
@@ -246,9 +246,10 @@ def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
 
 def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
     type_name = f"{peripheral.name.upper()}_peripheral_registers_t"
+    struct_name = f"{peripheral.name.upper()}_peripheral_registers_s"
     with output.header.open("a", encoding="utf-8") as f:
         f.write(f"/** {peripheral.description} */\n")
-        f.write("typedef struct {\n")
+        f.write(f"typedef struct {struct_name} {{\n")
 
         addressed_registers = {}
         for register in peripheral.registers:
@@ -276,6 +277,8 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
                 reg_type = (
                     f"{register.parent.name.upper()}_{reg_name.lower()}_t"
                 )
+                if hasattr(register, "description"):
+                    f.write(f"///{register.description}\n")
                 f.write(f"{reg_type} volatile {reg_name.lower()};\n")
                 current_offset = register.addressOffset + int(register.size / 8)
 
@@ -303,7 +306,11 @@ def write_register(output: PeripheralOutputStructure, register: Register):
     write_enums(output, register)
     reg_name: str = register_name(register)
     with output.header.open("a", encoding="utf-8") as f:
-        f.write("typedef union {\n")
+        type_name = f"{register.parent.name.upper()}_{reg_name.lower()}_t"
+        union_name = f"{register.parent.name.upper()}_{reg_name.lower()}_u"
+        if hasattr(register, "description"):
+            f.write(f"/** {register.description} */\n")
+        f.write(f"typedef union {union_name} {{\n")
         f.write("struct {\n")
 
         current_offset = 0
@@ -322,7 +329,6 @@ def write_register(output: PeripheralOutputStructure, register: Register):
 
         f.write("};\n")
         f.write(f"uint{register.size}_t bits;\n")
-        type_name = f"{register.parent.name.upper()}_{reg_name.lower()}_t"
         f.write(f"}} {type_name};\n")
         f.write(
             f"STATIC_ASSERT_TYPE_SIZE({type_name}, sizeof(uint{register.size}_t));\n"
@@ -346,14 +352,15 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
                 continue
 
             field_name = f"{peripheral_name}_{field.name.lower()}"
-            enum_type = f"{field_name}_t"
+            type_name = f"{field_name}_t"
+            enum_name = f"{field_name}_e"
 
-            if enum_type in written_enums:
+            if type_name in written_enums:
                 continue
-            written_enums.add(enum_type)
+            written_enums.add(type_name)
 
             f.write(f"/// {field.description}\n")
-            f.write("typedef enum {\n")
+            f.write(f"typedef enum {enum_name} {{\n")
             width = str(int(field.bitWidth / 4) + 1)
 
             for enum_value in field_enum.enumeratedValues:
@@ -362,7 +369,7 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
                 name = enum_value.name.lower()
                 f.write(f"///{desc}\n")
                 f.write(f"{field_name}_{name} = {value},\n")
-            f.write(f"}}{enum_type};\n")
+            f.write(f"}}{type_name};\n")
             f.write("\n")
 
 
