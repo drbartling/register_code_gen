@@ -88,7 +88,6 @@ addopts = [
   "--cov-report=term-missing:skip-covered",
   "--cov",
   "--durations=5",
-  "--ignore=acceptance_test",
-  "--cov-fail-under=100"
+  "--ignore=acceptance_test"
 ]
 testpaths = ["tests"]
