@@ -126,9 +126,11 @@ def write_main_source(output: OutputStructure, device: Device):
                     else f"{peripheral.derivedFrom.name.upper()}_peripheral_registers_t"
                 )
                 c.write(
-                    f"{type_name} * {peripheral.name.upper()} = (void *) (0x{peripheral.baseAddress:08X}UL);\n"
+                    f"{type_name} volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.baseAddress:08X}UL);\n"
                 )
-                h.write(f"extern {type_name} * {peripheral.name.upper()};\n")
+                h.write(
+                    f"extern {type_name} volatile * {peripheral.name.upper()};\n"
+                )
             h.write("\n")
 
 
@@ -279,7 +281,7 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
                 )
                 if hasattr(register, "description"):
                     f.write(f"///{register.description}\n")
-                f.write(f"{reg_type} volatile {reg_name.lower()};\n")
+                f.write(f"{reg_type} {reg_name.lower()};\n")
                 current_offset = register.addressOffset + int(register.size / 8)
 
             if 1 < len(registers):
