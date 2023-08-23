@@ -39,3 +39,13 @@ class EnumeratedValue:
         if hex_str:
             value = hex_str.groups()[0]
             self.value = int(value, 16)
+            return
+
+        bin_str = re.match(r"0b([0-1x]+)\b", self.value) or re.match(
+            r"#([0-1x]+)\b", self.value
+        )
+        if bin_str:
+            value = bin_str.groups()[0]
+            value = value.replace("x", "0")
+            self.value = int(value, 2)
+            return

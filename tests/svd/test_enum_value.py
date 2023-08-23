@@ -7,6 +7,10 @@ enum_value_init_params = [
     ("bar", "We use the bar option", "0x1", 1),
     ("bar", "We use the bar option", "0xf", 15),
     ("bar", "We use the bar option", "0xF", 15),
+    ("bar", "We use the bar option", "0b1111", 15),
+    ("bar", "We use the bar option", "0b1010", 0xA),
+    ("bar", "We use the bar option", "#1010", 0xA),
+    ("bar", "We use the bar option", "#101x", 0xA),
 ]
 
 
