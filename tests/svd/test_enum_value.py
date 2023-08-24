@@ -1,6 +1,43 @@
 import pytest
 
-from svd.enum_value import EnumeratedValue
+from svd.enum_value import EnumeratedValue, EnumeratedValues
+from svd.usage import Usage
+
+
+def test_enumerated_values_from_dict():
+    enums_dict = {
+        "name": "DMAEN1",
+        "enumeratedValue": [
+            {
+                "name": "B_0x0",
+                "description": "DAC channel1 DMA mode disabled",
+                "value": "0x0",
+            },
+            {
+                "name": "B_0x1",
+                "description": "DAC channel1 DMA mode enabled",
+                "value": "0x1",
+            },
+        ],
+    }
+
+    result = EnumeratedValues.from_dict(enums_dict)
+
+    assert None is result.parent
+    assert None is result.derived_from
+    assert "DMAEN1" == result.name
+    assert None is result.header_enum_name
+    assert Usage.READ_WRITE == result.usage
+    for enum_value in result.enumerated_values:
+        assert enum_value.parent is result
+        assert "DMAEN1" == enum_value.parent.name
+    assert "B_0x0" == result.enumerated_values[0].name
+    assert 0 == result.enumerated_values[0].value
+    assert "disabled" in result.enumerated_values[0].description
+    assert "B_0x1" == result.enumerated_values[1].name
+    assert 1 == result.enumerated_values[1].value
+    assert "enabled" in result.enumerated_values[1].description
+
 
 enum_value_init_params = [
     ("foo", "We use the foo option", 0, 0),
@@ -18,8 +55,7 @@ enum_value_init_params = [
     "name, description, value, expected_value", enum_value_init_params
 )
 def test_enum_value_init(name, description, value, expected_value):
-    result = EnumeratedValue(None, None, name, description, value, None)
-    assert result.derived_from is None
+    result = EnumeratedValue(None, name, description, value, None)
     assert result.parent is None
     assert result.name is name
     assert result.description is description
@@ -30,7 +66,7 @@ def test_enum_value_init(name, description, value, expected_value):
 enum_value_from_dict_params = [
     (
         {"name": "B_0x1", "description": "dac_ch1_trg1", "value": "0x1"},
-        EnumeratedValue(None, None, "B_0x1", "dac_ch1_trg1", "0x1", None),
+        EnumeratedValue(None, "B_0x1", "dac_ch1_trg1", "0x1", None),
     ),
 ]
 

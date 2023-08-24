@@ -15,21 +15,44 @@ class Field:
 class EnumeratedValues:
     parent: Optional["Field"]
     derived_from: Optional["EnumeratedValues"]
-    name: str
-    usage: Usage
+    name: Optional[str]
+    header_enum_name: Optional[str]
+    usage: Optional[Usage]
     enumerated_values: List["EnumeratedValue"]
+
+    def __iter__(self):
+        yield from self.enumerated_values
+
+    @classmethod
+    def from_dict(cls, enum_dict):
+        new_cls = cls(
+            parent=enum_dict.get("parent"),
+            derived_from=enum_dict.get("derivedFrom"),
+            name=enum_dict.get("name"),
+            header_enum_name=enum_dict.get("headerEnumName"),
+            usage=enum_dict.get("usage", Usage.READ_WRITE),
+            enumerated_values=[
+                EnumeratedValue.from_dict(ev)
+                for ev in enum_dict.get("enumeratedValue")
+            ],
+        )
+        for ev in new_cls:
+            ev.parent = new_cls
+        return new_cls
 
 
 @dataclass
 class EnumeratedValue:
     parent: Optional[EnumeratedValues]
-    derived_from: Optional["EnumeratedValues"]
-    name: str
-    description: str
+    name: Optional[str]
+    description: Optional[str]
     value: Optional[Union[int, str]]
     is_default: Optional[bool]
 
     def __post_init__(self):
+        self._parse_value()
+
+    def _parse_value(self):
         if not isinstance(self.value, str):
             return
 
@@ -51,12 +74,11 @@ class EnumeratedValue:
             return
 
     @classmethod
-    def from_dict(cls, enum_dict):
+    def from_dict(cls, enum_dict, parent=None):
         return cls(
-            None,
-            None,
-            enum_dict["name"],
-            enum_dict.get("description", ""),
-            enum_dict["value"],
-            None,
+            parent=parent,
+            name=enum_dict["name"],
+            description=enum_dict.get("description", ""),
+            value=enum_dict["value"],
+            is_default=None,
         )
