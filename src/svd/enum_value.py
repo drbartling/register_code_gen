@@ -49,3 +49,14 @@ class EnumeratedValue:
             value = value.replace("x", "0")
             self.value = int(value, 2)
             return
+
+    @classmethod
+    def from_dict(cls, enum_dict):
+        return cls(
+            None,
+            None,
+            enum_dict["name"],
+            enum_dict.get("description", ""),
+            enum_dict["value"],
+            None,
+        )

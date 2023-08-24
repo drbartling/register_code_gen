@@ -25,3 +25,17 @@ def test_enum_value_init(name, description, value, expected_value):
     assert result.description is description
     assert result.value is expected_value
     assert result.is_default is None
+
+
+enum_value_from_dict_params = [
+    (
+        {"name": "B_0x1", "description": "dac_ch1_trg1", "value": "0x1"},
+        EnumeratedValue(None, None, "B_0x1", "dac_ch1_trg1", "0x1", None),
+    ),
+]
+
+
+@pytest.mark.parametrize("enum_dict, expected", enum_value_from_dict_params)
+def test_enum_value_from_dict(enum_dict, expected):
+    result = EnumeratedValue.from_dict(enum_dict)
+    assert expected == result
