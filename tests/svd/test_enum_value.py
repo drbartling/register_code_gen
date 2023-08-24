@@ -75,3 +75,11 @@ enum_value_from_dict_params = [
 def test_enum_value_from_dict(enum_dict, expected):
     result = EnumeratedValue.from_dict(enum_dict)
     assert expected == result
+
+
+def test_enum_value_is_invalid():
+    # This call works
+    _ = (EnumeratedValue(None, "B_0x1", "dac_ch1_trg1", "0x1", None),)
+    with pytest.raises(ValueError):
+        # This one fails to parse
+        _ = (EnumeratedValue(None, "B_0x1", "dac_ch1_trg1", "01", None),)

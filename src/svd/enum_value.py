@@ -1,9 +1,12 @@
+import logging
 import re
 from typing import List, Optional, Union
 
 from pydantic.dataclasses import dataclass
 
 from svd.usage import Usage
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -72,6 +75,10 @@ class EnumeratedValue:
             value = value.replace("x", "0")
             self.value = int(value, 2)
             return
+
+        err_msg = f"Failed to parse {self.value} as integer"
+        _logger.error(err_msg)
+        raise ValueError(err_msg)
 
     @classmethod
     def from_dict(cls, enum_dict, parent=None):
