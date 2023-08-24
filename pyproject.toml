@@ -81,7 +81,8 @@ recursive = true
 [tool.pylint."messages control"]
 disable = [
   "missing-module-docstring",
-  "too-few-public-methods"  # For dataclasses with no methods
+  "too-few-public-methods",  # For dataclasses with no methods
+  "too-many-instance-attributes"  # For dataclasses
 ]
 
 [tool.pytest.ini_options]

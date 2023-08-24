@@ -4,7 +4,7 @@ from typing import List, Optional, Union
 
 from pydantic.dataclasses import dataclass
 
-from svd.usage import Usage
+from svd.basic_elements import Usage
 
 _logger = logging.getLogger(__name__)
 

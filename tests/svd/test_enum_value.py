@@ -1,7 +1,7 @@
 import pytest
 
+from svd.basic_elements import Usage
 from svd.enum_value import EnumeratedValue, EnumeratedValues
-from svd.usage import Usage
 
 
 def test_enumerated_values_from_dict():
