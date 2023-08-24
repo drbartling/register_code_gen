@@ -17,6 +17,7 @@ class Field:
     write_constraint: Optional[Dict] = None
     read_action: Optional[ReadAction] = None
     enumerated_values: Optional[EnumeratedValues] = None
+    derived_from: Optional["Field"] = None
 
     @classmethod
     def from_dict(cls, field_dict):
