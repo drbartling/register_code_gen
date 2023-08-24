@@ -29,7 +29,7 @@ show_missing = true
 [tool.coverage.run]
 branch = true
 parallel = true
-source = ["svd"]
+source = ["register_code_gen", "svd"]
 
 [tool.isort]
 line_length = 80
@@ -37,7 +37,7 @@ profile = "black"
 
 [tool.poetry]
 authors = ["Ryan Bartling <ryan.bartling@gmail.com>"]
-description = "Python application template"
+description = "Generate code for registers based on SVD files"
 include = ["README.md", "pyproject.toml"]
 name = "register-code-gen"
 readme = "README.md"
@@ -90,6 +90,8 @@ addopts = [
   "--cov-report=term-missing:skip-covered",
   "--cov",
   "--durations=5",
+  "--durations-min=0.02",
+  "--log-level=info",
   "--ignore=acceptance_test"
 ]
 testpaths = ["tests"]
