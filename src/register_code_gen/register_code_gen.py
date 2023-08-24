@@ -1,8 +1,10 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree
 
 import click
+import xmltodict
 from pysvd.element import Device, Field, Peripheral, Register
 
 
@@ -31,13 +33,21 @@ from pysvd.element import Device, Field, Peripheral, Register
         path_type=Path,
     ),
 )
-def main(input_file, output_dir):  # pragma: no cover
+def main(input_file: Path, output_dir: Path):  # pragma: no cover
     """Generate C header and dir from CMSIS-SVD which is often used to provide register descriptions for microcontrollers"""
+
+    with input_file.open("r", encoding="utf-8") as f:
+        data = f.read()
+    svd_dict = xmltodict.parse(data)
+
     node = ElementTree.parse(input_file).getroot()
     device = Device(node)
     if output_dir is None:
         output_dir = Path(device.name.lower())  # pylint: disable=no-member
     output = OutputStructure(output_dir, device)
+
+    with output.json_file.open("w", encoding="utf-8") as f:
+        json.dump(svd_dict, f, indent=2)
     output.main_header.parent.mkdir(parents=True, exist_ok=True)
     output.main_header.open("w", encoding="utf-8")
     output.main_source.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +62,11 @@ def main(input_file, output_dir):  # pragma: no cover
 class OutputStructure:
     output_root: Path
     device: Device
+
+    @property
+    def json_file(self) -> Path:
+        # pylint: disable=no-member
+        return self.output_root / f"{self.device.name.lower()}.json"
 
     @property
     def src_dir(self) -> Path:
