@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from pydantic.dataclasses import dataclass
 
@@ -16,7 +16,7 @@ class Field:
 
 @dataclass
 class EnumeratedValues:
-    parent: Optional["Field"]
+    parent: Optional[Any]
     derived_from: Optional["EnumeratedValues"]
     name: Optional[str]
     header_enum_name: Optional[str]
@@ -27,9 +27,9 @@ class EnumeratedValues:
         yield from self.enumerated_values
 
     @classmethod
-    def from_dict(cls, enum_dict):
+    def from_dict(cls, enum_dict, parent=None):
         new_cls = cls(
-            parent=enum_dict.get("parent"),
+            parent=parent,
             derived_from=enum_dict.get("derivedFrom"),
             name=enum_dict.get("name"),
             header_enum_name=enum_dict.get("headerEnumName"),
