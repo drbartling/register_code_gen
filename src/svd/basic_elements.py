@@ -14,6 +14,12 @@ class Access(Enum):
     READ_WRITE_ONCE = "read-writeOnce"
 
 
+class AddressBlockUsage(Enum):
+    REGISTERS = "registers"
+    BUFFER = "buffer"
+    RESERVED = "reserved"
+
+
 class ModifiedWriteValues(Enum):
     ONE_TO_CLEAR = "oneToClear"
     ONE_TO_SET = "oneToSet"

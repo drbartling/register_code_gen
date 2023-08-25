@@ -40,6 +40,26 @@ register_from_dict_params = [
             "size": "0x20",
             "access": "read-write",
             "resetValue": "0xFFFFFFFF",
+        },
+        {
+            "name": "CRC_DR",
+            "display_name": "CRC_DR",
+            "description": "Data register",
+            "address_offset": 0x0,
+            "size": 0x20,
+            "access": Access.READ_WRITE,
+            "reset_value": 0xFFFFFFFF,
+        },
+    ),
+    (
+        {
+            "name": "CRC_DR",
+            "displayName": "CRC_DR",
+            "description": "Data register",
+            "addressOffset": "0x0",
+            "size": "0x20",
+            "access": "read-write",
+            "resetValue": "0xFFFFFFFF",
             "fields": {
                 "field": {
                     "name": "DR",
