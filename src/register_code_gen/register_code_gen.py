@@ -1,11 +1,17 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from xml.etree import ElementTree
 
 import click
 import xmltodict
-from pysvd.element import Device, Field, Peripheral, Register
+from rich.traceback import install
+
+from svd.device import Device
+from svd.field import Field
+from svd.peripheral import Peripheral
+from svd.register import Register
+
+install()
 
 
 @click.command()
@@ -39,9 +45,8 @@ def main(input_file: Path, output_dir: Path):  # pragma: no cover
     with input_file.open("r", encoding="utf-8") as f:
         data = f.read()
     svd_dict = xmltodict.parse(data)
+    device = Device.from_dict(svd_dict["device"])
 
-    node = ElementTree.parse(input_file).getroot()
-    device = Device(node)
     if output_dir is None:
         output_dir = Path(device.name.lower())  # pylint: disable=no-member
     output = OutputStructure(output_dir, device)
@@ -130,15 +135,15 @@ def write_main_source(output: OutputStructure, device: Device):
             c.write(f'#include "{include_path}"\n\n')
             for peripheral in sorted(
                 device.peripherals,
-                key=lambda peripheral: peripheral.baseAddress,
+                key=lambda peripheral: peripheral.base_address,
             ):
                 type_name = (
                     f"{peripheral.name.upper()}_peripheral_registers_t"
-                    if peripheral.derivedFrom is None
-                    else f"{peripheral.derivedFrom.name.upper()}_peripheral_registers_t"
+                    if peripheral.derived_from is None
+                    else f"{peripheral.derived_from.name.upper()}_peripheral_registers_t"
                 )
                 c.write(
-                    f"{type_name} volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.baseAddress:08X}UL);\n"
+                    f"{type_name} volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.base_address:08X}UL);\n"
                 )
                 h.write(
                     f"extern {type_name} volatile * {peripheral.name.upper()};\n"
@@ -159,7 +164,7 @@ def write_peripherals(output: OutputStructure, device: Device):
         for p in sorted(
             device.peripherals, key=lambda peripheral: peripheral.name
         ):
-            if p.derivedFrom is None:
+            if p.derived_from is None:
                 include_path = output.include_dir / f"{p.name.lower()}.h"
                 include_path = include_path.relative_to(output.include_root)
                 f.write(f'#include "{include_path}"\n')
@@ -221,7 +226,7 @@ def write_peripheral_header(
         except AttributeError:
             pass
         try:
-            f.write(f"* Derived From: {peripheral.derivedFrom.name}\n")
+            f.write(f"* Derived From: {peripheral.derived_from.name}\n")
         except AttributeError:
             pass
         f.write("*\n")
@@ -251,7 +256,7 @@ def write_peripheral_footer(output: OutputStructure, peripheral: Peripheral):
 
 def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
     for r in sorted(
-        peripheral.registers, key=lambda register: register.addressOffset
+        peripheral.registers, key=lambda register: register.address_offset
     ):
         write_register(output, r)
 
@@ -266,9 +271,9 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
         addressed_registers = {}
         for register in peripheral.registers:
             try:
-                addressed_registers[register.addressOffset].append(register)
+                addressed_registers[register.address_offset].append(register)
             except KeyError:
-                addressed_registers[register.addressOffset] = list([register])
+                addressed_registers[register.address_offset] = list([register])
 
         current_offset = 0
         for address in sorted(list(addressed_registers.keys())):
@@ -292,17 +297,19 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
                 if hasattr(register, "description"):
                     f.write(f"///{register.description}\n")
                 f.write(f"{reg_type} {reg_name.lower()};\n")
-                current_offset = register.addressOffset + int(register.size / 8)
+                current_offset = register.address_offset + int(
+                    register.size / 8
+                )
 
             if 1 < len(registers):
                 f.write("};\n")
         f.write(f"}} {type_name};\n")
         for register in sorted(
-            peripheral.registers, key=lambda register: register.addressOffset
+            peripheral.registers, key=lambda register: register.address_offset
         ):
             reg_name: str = register_name(register)
             f.write(
-                f"STATIC_ASSERT_MEMBER_OFFSET({type_name}, {reg_name.lower()}, 0x{register.addressOffset:02X});\n"
+                f"STATIC_ASSERT_MEMBER_OFFSET({type_name}, {reg_name.lower()}, 0x{register.address_offset:02X});\n"
             )
 
         f.write("\n")
@@ -327,17 +334,17 @@ def write_register(output: PeripheralOutputStructure, register: Register):
 
         current_offset = 0
         for field in sorted(
-            register.fields, key=lambda register: register.bitOffset
+            register.fields, key=lambda register: register.bit_offset
         ):
-            if current_offset < field.bitOffset:
+            if current_offset < field.bit_offset:
                 reserved_offset = current_offset
-                reserved_width = field.bitOffset - reserved_offset
+                reserved_width = field.bit_offset - reserved_offset
                 write_reserved(
                     f, register.size, reserved_offset, reserved_width
                 )
                 current_offset = reserved_offset + reserved_width
             write_field(f, field)
-            current_offset = field.bitOffset + field.bitWidth
+            current_offset = field.bit_offset + field.bit_width
 
         f.write("};\n")
         f.write(f"uint{register.size}_t bits;\n")
@@ -356,11 +363,9 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
 
     with output.header.open("a", encoding="utf-8") as f:
         for field in sorted(
-            register.fields, key=lambda register: register.bitOffset
+            register.fields, key=lambda register: register.bit_offset
         ):
-            try:
-                field_enum = field.enumeratedValues
-            except AttributeError:
+            if None is field.enumerated_values:
                 continue
 
             field_name = f"{peripheral_name}_{field.name.lower()}"
@@ -373,9 +378,9 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
 
             f.write(f"/**\n * {field.description}\n */\n")
             f.write(f"typedef enum {enum_name} {{\n")
-            width = str(int(field.bitWidth / 4) + 1)
+            width = str(int(field.bit_width / 4) + 1)
 
-            for enum_value in field_enum.enumeratedValues:
+            for enum_value in field.enumerated_values:
                 value = f"0x{enum_value.value:0{width}X}"
                 desc = enum_value.description
                 name = enum_value.name.lower()
@@ -386,12 +391,12 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
 
 
 def write_field(f, field: Field):
-    if field.derivedFrom is not None:
-        type_field = field.derivedFrom
+    if field.derived_from is not None:
+        type_field = field.derived_from
     else:
         type_field = field
 
-    if hasattr(type_field, "enumeratedValues"):
+    if type_field.enumerated_values:
         peripheral_name = type_field.parent.parent.name
         field_name = f"{peripheral_name}_{type_field.name.lower()}"
         field_type = f"{field_name}_t"
@@ -401,7 +406,7 @@ def write_field(f, field: Field):
 
     const = "const" if str(field.access) == "read-only" else ""
     f.write(f"///{field.description}\n")
-    f.write(f"{field_type} {const} {field.name.lower()}:{field.bitWidth};\n")
+    f.write(f"{field_type} {const} {field.name.lower()}:{field.bit_width};\n")
 
 
 def write_reserved(f, reg_size, offset, width):

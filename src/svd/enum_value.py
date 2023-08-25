@@ -28,6 +28,9 @@ class EnumeratedValues:
 
     @classmethod
     def from_dict(cls, enum_dict, parent=None):
+        if isinstance(enum_dict.get("enumeratedValue"), dict):
+            enum_dict["enumeratedValue"] = [enum_dict["enumeratedValue"]]
+
         new_cls = cls(
             parent=parent,
             derived_from=enum_dict.get("derivedFrom"),

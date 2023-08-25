@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic.dataclasses import dataclass
 
@@ -14,12 +14,14 @@ class Register:
     display_name: Optional[str] = None
     description: Optional[str] = None
     alternate_group: Optional[str] = None
-    alternate_register: Optional["Register"] = None
-    size: Optional[int] = 32
+    alternate_register: Optional[Union[str, "Register"]] = None
+
+    size: Optional[int] = None
     access: Optional[Access] = None
-    protection: Optional[Access] = None
+    protection: Optional[str] = None
     reset_value: Optional[int] = None
     reset_mask: Optional[int] = None
+
     data_type: Optional[str] = None
     modified_write_values: Optional[ModifiedWriteValues] = None
     write_constraint: Optional[Dict] = None
@@ -40,13 +42,25 @@ class Register:
             description=register_dict.get("description"),
             alternate_group=register_dict.get("alternateGroup"),
             alternate_register=register_dict.get("alternateRegister"),
-            size=basic_elements.parse_int(register_dict.get("size")),
-            access=register_dict.get("access"),
-            protection=register_dict.get("protection"),
-            reset_value=basic_elements.parse_int(
-                register_dict.get("resetValue")
+            size=basic_elements.parse_int(
+                register_dict.get("size", parent.size if parent else None)
             ),
-            reset_mask=register_dict.get("reset_mask"),
+            access=register_dict.get(
+                "access", parent.access if parent else None
+            ),
+            protection=register_dict.get(
+                "protection", parent.protection if parent else None
+            ),
+            reset_value=basic_elements.parse_int(
+                register_dict.get(
+                    "resetValue", parent.reset_value if parent else None
+                )
+            ),
+            reset_mask=basic_elements.parse_int(
+                register_dict.get(
+                    "resetMask", parent.reset_mask if parent else None
+                )
+            ),
             data_type=register_dict.get("data_type"),
             modified_write_values=register_dict.get("modifiedWriteValues"),
             write_constraint=register_dict.get("writeConstraint"),

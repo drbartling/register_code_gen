@@ -20,6 +20,13 @@ class AddressBlockUsage(Enum):
     RESERVED = "reserved"
 
 
+class Endian(Enum):
+    LITTLE = "little"
+    BIG = "big"
+    SELECTABLE = "selectable"
+    OTHER = "other"
+
+
 class ModifiedWriteValues(Enum):
     ONE_TO_CLEAR = "oneToClear"
     ONE_TO_SET = "oneToSet"
@@ -63,7 +70,7 @@ def parse_int(value: Optional[Union[int, str]]):
 
     value = value.strip()
 
-    hex_str = re.match(r"0x([0-9a-fA-F]+)\b", value)
+    hex_str = re.match(r"0[xX]([0-9a-fA-F]+)\b", value)
     if hex_str:
         value = hex_str.groups()[0]
         value = int(value, 16)
@@ -78,6 +85,4 @@ def parse_int(value: Optional[Union[int, str]]):
         value = int(value, 2)
         return value
 
-    err_msg = f"Failed to parse {value} as integer"
-    _logger.error(err_msg)
-    raise ValueError(err_msg)
+    return int(value)
