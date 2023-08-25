@@ -39,7 +39,9 @@ class Register:
                 register_dict.get("addressOffset")
             ),
             display_name=register_dict.get("displayName"),
-            description=register_dict.get("description"),
+            description=basic_elements.parse_description(
+                register_dict.get("description")
+            ),
             alternate_group=register_dict.get("alternateGroup"),
             alternate_register=register_dict.get("alternateRegister"),
             size=basic_elements.parse_int(

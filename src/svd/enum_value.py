@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Union
 
 from pydantic.dataclasses import dataclass
 
+from svd import basic_elements
 from svd.basic_elements import Usage
 
 _logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ class EnumeratedValue:
 
     def __post_init__(self):
         self._parse_value()
+        self.description = basic_elements.parse_description(self.description)
 
     def _parse_value(self):
         if not isinstance(self.value, str):

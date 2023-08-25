@@ -86,3 +86,9 @@ def parse_int(value: Optional[Union[int, str]]):
         return value
 
     return int(value)
+
+
+def parse_description(value: Optional[str]):
+    if value is None:
+        return value
+    return re.sub(r"[\s\n\r]+", " ", value)

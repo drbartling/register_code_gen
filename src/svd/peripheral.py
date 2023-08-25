@@ -48,7 +48,9 @@ class Peripheral:
                 peripheral_dict.get("addressBlock")
             ),
             version=peripheral_dict.get("version"),
-            description=peripheral_dict.get("description"),
+            description=basic_elements.parse_description(
+                peripheral_dict.get("description")
+            ),
             alternate_peripheral=peripheral_dict.get("alternatePeripheral"),
             group_name=peripheral_dict.get("group_name"),
             prepend_to_name=peripheral_dict.get("prependToName"),

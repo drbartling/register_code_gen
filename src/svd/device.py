@@ -41,7 +41,9 @@ class Device:
             name=device_dict.get("name"),
             series=device_dict.get("series"),
             version=device_dict.get("version"),
-            description=device_dict.get("description"),
+            description=basic_elements.parse_description(
+                device_dict.get("description")
+            ),
             license_text=device_dict.get("licenseText"),
             cpu=Cpu.from_dict(device_dict.get("cpu")),
             header_system_filename=device_dict.get("headerSystemFilename"),

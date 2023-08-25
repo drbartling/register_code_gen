@@ -6,6 +6,7 @@ import click
 import xmltodict
 from rich.traceback import install
 
+from svd.basic_elements import Access
 from svd.device import Device
 from svd.field import Field
 from svd.peripheral import Peripheral
@@ -404,7 +405,7 @@ def write_field(f, field: Field):
         size = type_field.parent.size
         field_type = f"uint{size}_t"
 
-    const = "const" if str(field.access) == "read-only" else ""
+    const = "const" if field.access == Access.READ_ONLY else ""
     f.write(f"///{field.description}\n")
     f.write(f"{field_type} {const} {field.name.lower()}:{field.bit_width};\n")
 

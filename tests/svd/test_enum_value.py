@@ -57,9 +57,9 @@ enum_value_init_params = [
 def test_enum_value_init(name, description, value, expected_value):
     result = EnumeratedValue(None, name, description, value, None)
     assert result.parent is None
-    assert result.name is name
-    assert result.description is description
-    assert result.value is expected_value
+    assert result.name == name
+    assert result.description == description
+    assert result.value == expected_value
     assert result.is_default is None
 
 

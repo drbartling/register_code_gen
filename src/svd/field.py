@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 from pydantic.dataclasses import dataclass
 
+from svd import basic_elements
 from svd.basic_elements import Access, ModifiedWriteValues, ReadAction
 from svd.enum_value import EnumeratedValues
 
@@ -26,7 +27,9 @@ class Field:
             name=field_dict["name"],
             bit_offset=field_dict.get("bitOffset"),
             bit_width=field_dict.get("bitWidth"),
-            description=field_dict.get("description"),
+            description=basic_elements.parse_description(
+                field_dict.get("description")
+            ),
             access=field_dict.get("access"),
             modified_write_values=field_dict.get("modified_write_values"),
             write_constraint=field_dict.get("write_constraint"),
