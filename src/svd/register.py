@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic.dataclasses import dataclass
 
@@ -25,10 +25,12 @@ class Register:
     write_constraint: Optional[Dict] = None
     read_action: Optional[ReadAction] = None
     fields: Optional[List[Field]] = None
+
     derived_from: Optional["Register"] = None
+    parent: Optional[Any] = None
 
     @classmethod
-    def from_dict(cls, register_dict):
+    def from_dict(cls, register_dict, parent=None):
         new_cls = cls(
             name=register_dict.get("name"),
             address_offset=basic_elements.parse_int(
@@ -50,6 +52,7 @@ class Register:
             write_constraint=register_dict.get("writeConstraint"),
             read_action=register_dict.get("readAction"),
             derived_from=register_dict.get("derivedFrom"),
+            parent=parent,
         )
         if fields := register_dict.get("fields"):
             fields = fields["field"]
