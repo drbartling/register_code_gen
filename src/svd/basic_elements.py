@@ -1,4 +1,9 @@
+import logging
+import re
 from enum import Enum
+from typing import Optional, Union
+
+_logger = logging.getLogger(__name__)
 
 
 class Access(Enum):
@@ -41,3 +46,32 @@ class Usage(Enum):
                 return ""
             case Usage.READ_WRITE:
                 return ""
+
+
+def parse_int(value: Optional[Union[int, str]]):
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        return value
+    value: str = value
+
+    value = value.strip()
+
+    hex_str = re.match(r"0x([0-9a-fA-F]+)\b", value)
+    if hex_str:
+        value = hex_str.groups()[0]
+        value = int(value, 16)
+        return value
+
+    bin_str = re.match(r"0b([0-1x]+)\b", value) or re.match(
+        r"#([0-1x]+)\b", value
+    )
+    if bin_str:
+        value = bin_str.groups()[0]
+        value = value.replace("x", "0")
+        value = int(value, 2)
+        return value
+
+    err_msg = f"Failed to parse {value} as integer"
+    _logger.error(err_msg)
+    raise ValueError(err_msg)

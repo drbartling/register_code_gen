@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic.dataclasses import dataclass
 
@@ -18,9 +18,10 @@ class Field:
     read_action: Optional[ReadAction] = None
     enumerated_values: Optional[EnumeratedValues] = None
     derived_from: Optional["Field"] = None
+    parent: Optional[Any] = None
 
     @classmethod
-    def from_dict(cls, field_dict):
+    def from_dict(cls, field_dict, parent=None):
         new_cls = cls(
             name=field_dict["name"],
             bit_offset=field_dict.get("bitOffset"),
@@ -30,6 +31,7 @@ class Field:
             modified_write_values=field_dict.get("modified_write_values"),
             write_constraint=field_dict.get("write_constraint"),
             read_action=field_dict.get("readAction"),
+            parent=parent,
         )
 
         if enum_values := field_dict.get("enumeratedValues"):
