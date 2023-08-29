@@ -11,8 +11,8 @@ def test_template_matches_string_template_interface():
     assert "tim likes kung pao" == result
 
     d = {"who": "tim"}
-    result = Template("Give ${who} $$100").substitute(d)
-    assert "Give tim $100" == result
+    result = Template("Give ${who} $$200").substitute(d)
+    assert "Give tim $200" == result
 
     with pytest.raises(KeyError):
         result = t.substitute(d)
@@ -45,13 +45,30 @@ def test_we_merge_dict_with_kwargs():
 
 
 def test_we_can_access_object_attributes():
-    t = Template("Hello, ${person.name}")
+    @dataclass
+    class Person:
+        name: str = "Bob"
+
     p = Person()
+    t = Template("Hello, ${person.name}")
     result = t.substitute(person=p)
     expected = "Hello, Bob"
     assert expected == result
 
 
-@dataclass
-class Person:
-    name: str = "Bob"
+def test_we_can_recursevily_resolve_templates():
+    templates = {
+        "full_name": "${person.name.first} ${person.name.last}",
+        "last_first": "${person.name.last}, ${person.name.first}",
+    }
+    person = {
+        "name": {
+            "first": "Charles",
+            "last": "Dickens",
+        },
+        "title": "Mr.",
+    }
+    t = Template("Hello, ${person.title} ${templates.last_first}")
+    result = t.substitute(person=person, templates=templates)
+    expected = "Hello, Mr. Dickens, Charles"
+    assert expected == result
