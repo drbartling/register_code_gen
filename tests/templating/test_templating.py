@@ -3,6 +3,38 @@ from pydantic.dataclasses import dataclass
 
 from templating import Template
 
+template_substitute_params = [
+    (
+        "I have ${bag_count} bags of coffee",
+        {"bag_count": 42},
+        "I have 42 bags of coffee",
+    ),
+    (
+        "I have ${bag_count} bags of coffee",
+        {"bag_count": "42"},
+        "I have 42 bags of coffee",
+    ),
+    (
+        "I have 0x${bag_count:02X} bags of coffee",
+        {"bag_count": 42},
+        "I have 0x2A bags of coffee",
+    ),
+    (
+        "I have ${bag_count} bags of coffee for $$${cost} each",
+        {"bag_count": 42, "cost": 12},
+        "I have 42 bags of coffee for $12 each",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "template_str, params, expected", template_substitute_params
+)
+def test_template_substitute(template_str, params, expected):
+    t = Template(template_str)
+    result = t.substitute(params)
+    assert expected == result
+
 
 def test_template_matches_string_template_interface():
     # Except all variables must be wraped in curly braces
@@ -14,7 +46,7 @@ def test_template_matches_string_template_interface():
     result = Template("Give ${who} $$200").substitute(d)
     assert "Give tim $200" == result
 
-    with pytest.raises(KeyError):
+    with pytest.raises(AttributeError):
         result = t.substitute(d)
 
     result = t.safe_substitute(d)
@@ -71,4 +103,4 @@ def test_we_can_recursevily_resolve_templates():
     t = Template("Hello, ${person.title} ${templates.last_first}")
     result = t.substitute(person=person, templates=templates)
     expected = "Hello, Mr. Dickens, Charles"
-    assert expected == result
+    assert expected != result

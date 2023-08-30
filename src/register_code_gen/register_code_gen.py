@@ -7,6 +7,7 @@ import click
 import xmltodict
 from rich.traceback import install
 
+import templating
 from svd.basic_elements import Access
 from svd.device import Device
 from svd.field import Field
@@ -18,6 +19,7 @@ install()
 
 with open("c_template.toml", "rb") as toml_file:
     templates = tomllib.load(toml_file)
+    templates = templating.named_tuple_from_dict("Templates", templates)
 
 
 @click.command()
@@ -105,7 +107,7 @@ class OutputStructure:
 
 def write_header(output: OutputStructure, device: Device):
     with output.main_header.open("a", encoding="utf-8") as f:
-        template_str = templates["device_header"]["top"]
+        template_str = templates.device_header.top
         t = Template(template_str)
         s = t.substitute(device=device)
         f.write(s)
@@ -151,7 +153,8 @@ def write_peripherals(output: OutputStructure, device: Device):
                 include_path = output.include_dir / f"{p.name.lower()}.h"
                 include_path = include_path.relative_to(output.include_root)
 
-                t = Template(templates["peripheral"]["include"])
+                t_str = templates.peripheral.include
+                t = Template(t_str)
                 s = t.substitute(
                     device=device, peripheral=p, templates=templates
                 )

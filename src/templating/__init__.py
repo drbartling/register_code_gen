@@ -1,79 +1,108 @@
 import collections
+import functools
 import re
+from collections import namedtuple
+from copy import deepcopy
 from enum import Enum
 from string import Template as PyTemplate
+from typing import Any
 
 _sentinel_dict = {}
 
 
 # pylint: disable=dangerous-default-value
-class Template(PyTemplate):
-    braceidpattern = r"(?a:[_a-z][_a-z0-9\.]*)"
+# We use the fact that a default of a dict type is static in order to detect if
+# the __mapping variable was not passed.
+class Template:
+    patter_str = r"\$(?:(?P<escaped>\$)|{(?P<braced>.+?)}|(?P<invalid>))"
+
+    def __init__(self, template):
+        self.pattern: re.Pattern = re.compile(self.patter_str, re.VERBOSE)
+        self.template = template
 
     def substitute(self, __mapping=_sentinel_dict, /, **kwds) -> str:
         # Using the fact that a default dict is a fixed object to detect if an
-        # un named mapping dictioanry was passed in.
+        # unnamed mapping dictioanry was passed in.
         mapping = self._mapping(__mapping, **kwds)
+        mapping = named_tuple_from_dict("mapping", mapping)
 
-        result = super().substitute(mapping)
-        if result != self.template:
-            if re.search(r"\${", result):
-                result = re.sub(r"\$([^{])", r"$$\1", result)
-                t = Template(result)
-                result = t.substitute(mapping)
-        return result
+        def convert(match_object):
+            # Explicitely use `mapping` in this closure, otherwise the implicite
+            # use in eval won't work
+            mapping  # pylint: disable=pointless-statement
+
+            if expression := match_object.group("braced"):
+                f_string = rf'f"{{mapping.{expression}}}"'
+                return eval(f_string)  # pylint: disable=eval-used
+            if expression := match_object.group("escaped"):
+                return "$"
+            if expression := match_object.group("invalid"):
+                return match_object.group()
+            raise LookupError(
+                f"Unexpected match group in {match_object.group()}"
+            )
+
+        return self.pattern.sub(convert, self.template)
 
     def safe_substitute(self, __mapping=_sentinel_dict, /, **kwds) -> str:
         # Using the fact that a default dict is a fixed object to detect if an
-        # un named mapping dictioanry was passed in.
+        # unnamed mapping dictioanry was passed in.
         mapping = self._mapping(__mapping, **kwds)
+        mapping = named_tuple_from_dict("mapping", mapping)
 
-        result = super().safe_substitute(mapping)
-        if result != self.template:
-            t = Template(result)
-            result = t.safe_substitute(mapping)
-        return result
+        def convert(match_object):
+            # Explicitely use `mapping` in this closure, otherwise the implicite
+            # use in eval won't work
+            mapping  # pylint: disable=pointless-statement
 
-    def _mapping(self, __mapping=_sentinel_dict, /, **kwds):
+            if expression := match_object.group("braced"):
+                f_string = rf'f"{{mapping.{expression}}}"'
+                try:
+                    return eval(f_string)  # pylint: disable=eval-used
+                except Exception:  # pylint: disable=broad-exception-caught
+                    return match_object.group()
+            if expression := match_object.group("escaped"):
+                return "$"
+            if expression := match_object.group("invalid"):
+                return match_object.group()
+            raise LookupError(
+                f"Unexpected match group in {match_object.group()}"
+            )
+
+        return self.pattern.sub(convert, self.template)
+
+    def _mapping(self, __mapping=_sentinel_dict, /, **kwds) -> dict[str, Any]:
         assert isinstance(__mapping, dict)
         assert isinstance(kwds, dict)
 
         if __mapping is _sentinel_dict:
-            mapping = _flatten(kwds)
+            mapping = kwds
         else:
-            mapping = _flatten(__mapping) | _flatten(kwds)
+            mapping = _merge(__mapping, kwds)
         return mapping
 
 
-def _flatten(obj, parent_key=None, separator="."):
-    if isinstance(obj, collections.abc.MutableMapping):
-        return _flatten_dict(obj, parent_key, separator)
-    if isinstance(obj, list):
-        return _flatten_list(obj, parent_key, separator)
-    if isinstance(obj, Enum):
-        return {parent_key: str(obj)}
-    if hasattr(obj, "__dict__"):
-        return _flatten_dict(obj.__dict__, parent_key, separator)
-    return {parent_key: str(obj)}
-
-
-def _flatten_dict(dictionary, parent_key, separator):
+def named_tuple_from_dict(name: str, dictionary: dict[str, Any]):
     assert isinstance(dictionary, collections.abc.MutableMapping)
-    items = {}
-    for key, value in dictionary.items():
-        if key == "parent":
-            continue
-        new_key = key if parent_key is None else f"{parent_key}{separator}{key}"
-        items |= _flatten(value, new_key, separator)
-    return items
+
+    for k, v in dictionary.items():
+        if isinstance(v, collections.abc.MutableMapping):
+            dictionary[k] = named_tuple_from_dict(k, v)
+
+    new_tuple = namedtuple(name, dictionary)
+    tuple_obj = new_tuple(**dictionary)
+    return tuple_obj
 
 
-def _flatten_list(values, parent_key, separator):
-    assert isinstance(values, list)
-    items = {}
-    for i, v in enumerate(values):
-        new_key = (
-            str(i) if parent_key is None else f"{parent_key}{separator}{str(i)}"
-        )
-        items |= _flatten(v, new_key, separator)
-    return items
+def _merge(a, b):
+    for k, vb in b.items():
+        if va := a.get(k):
+            if isinstance(vb, collections.abc.MutableMapping) and isinstance(
+                va, collections.abc.MutableMapping
+            ):
+                _merge(va, vb)
+            else:
+                a[k] = b[k]
+        else:
+            a[k] = b[k]
+    return a
