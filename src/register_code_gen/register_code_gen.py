@@ -59,12 +59,14 @@ def main(input_file: Path, output_dir: Path):  # pragma: no cover
         output_dir = Path(device.name.lower())  # pylint: disable=no-member
     output = OutputStructure(output_dir, device)
 
-    with output.json_file.open("w", encoding="utf-8") as f:
-        json.dump(svd_dict, f, indent=2)
     output.main_header.parent.mkdir(parents=True, exist_ok=True)
     output.main_header.open("w", encoding="utf-8")
     output.main_source.parent.mkdir(parents=True, exist_ok=True)
     output.main_source.open("w", encoding="utf-8")
+
+    with output.json_file.open("w", encoding="utf-8") as f:
+        json.dump(svd_dict, f, indent=2)
+
     write_header(output, device)
     write_peripherals(output, device)
     write_main_source(output, device)
@@ -112,10 +114,11 @@ def write_header(output: OutputStructure, device: Device):
 
 
 def write_main_source(output: OutputStructure, device: Device):
-    include_path = output.main_header.relative_to(output.include_root)
     with output.main_header.open("a", encoding="utf-8") as h:
         with output.main_source.open("a", encoding="utf-8") as c:
-            c.write(f'#include "{include_path}"\n\n')
+            s = Template(templates.device.include).substitute(device=device)
+            c.write(s)
+            c.write("\n")
             for peripheral in sorted(
                 device.peripherals,
                 key=lambda peripheral: peripheral.base_address,
@@ -143,7 +146,7 @@ def write_peripherals(output: OutputStructure, device: Device):
         for p in sorted(
             device.peripherals, key=lambda peripheral: peripheral.name
         ):
-            if p.derived_from is None:
+            if p.derived_from is p:
                 include_path = output.include_dir / f"{p.name.lower()}.h"
                 include_path = include_path.relative_to(output.include_root)
 
@@ -192,7 +195,7 @@ def write_peripheral_header(
 ):
     with output.header.open("w", encoding="utf-8") as f:
         s = Template(templates.peripheral.header.top).substitute(
-            peripheral=peripheral
+            peripheral=peripheral, device=peripheral.parent
         )
         f.write(s)
 
@@ -200,7 +203,7 @@ def write_peripheral_header(
 def write_peripheral_footer(output: OutputStructure, peripheral: Peripheral):
     with output.header.open("a", encoding="utf-8") as f:
         s = Template(templates.peripheral.header.bottom).substitute(
-            peripheral=peripheral
+            peripheral=peripheral, templates=templates, device=peripheral.parent
         )
         f.write(s)
 
@@ -213,11 +216,11 @@ def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
 
 
 def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
-    type_name = f"{peripheral.name.upper()}_peripheral_registers_t"
-    struct_name = f"{peripheral.name.upper()}_peripheral_registers_s"
     with output.header.open("a", encoding="utf-8") as f:
-        f.write(f"/**\n* {peripheral.description}\n*/\n")
-        f.write(f"typedef struct {struct_name} {{\n")
+        s = Template(templates.peripheral.structure.top).substitute(
+            peripheral=peripheral, templates=templates, device=peripheral.parent
+        )
+        f.write(s)
 
         addressed_registers = {}
         for register in peripheral.registers:
@@ -254,14 +257,22 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
 
             if 1 < len(registers):
                 f.write("};\n")
-        f.write(f"}} {type_name};\n")
+
+        s = Template(templates.peripheral.structure.bottom).substitute(
+            peripheral=peripheral, templates=templates, device=peripheral.parent
+        )
+        f.write(s)
+
         for register in sorted(
             peripheral.registers, key=lambda register: register.address_offset
         ):
-            reg_name: str = register_name(register)
-            f.write(
-                f"STATIC_ASSERT_MEMBER_OFFSET({type_name}, {reg_name.lower()}, 0x{register.address_offset:02X});\n"
+            s = Template(templates.register.offset_assert).substitute(
+                peripheral=peripheral,
+                templates=templates,
+                device=peripheral.parent,
+                register=register,
             )
+            f.write(s)
 
         f.write("\n")
 
