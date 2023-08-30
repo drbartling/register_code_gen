@@ -16,7 +16,7 @@ def test_peripheral_basic_init():
 
     assert None is result.parent
 
-    assert None is result.derived_from
+    assert result is result.derived_from
 
     assert "TIM1" == result.name
     assert None is result.version
@@ -116,7 +116,7 @@ def test_peripheral_from_dict():
     assert None is result.reset_value
     assert None is result.reset_mask
     assert None is result.interrupt
-    assert None is result.derived_from
+    assert result is result.derived_from
     assert None is result.parent
 
     for register in result.registers:

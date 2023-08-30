@@ -103,4 +103,4 @@ def test_we_can_recursevily_resolve_templates():
     t = Template("Hello, ${person.title} ${templates.last_first}")
     result = t.substitute(person=person, templates=templates)
     expected = "Hello, Mr. Dickens, Charles"
-    assert expected != result
+    assert expected == result

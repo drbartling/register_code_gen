@@ -130,9 +130,11 @@ def write_main_source(output: OutputStructure, device: Device):
                 c.write(
                     f"{type_name} volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.base_address:08X}UL);\n"
                 )
-                h.write(
-                    f"extern {type_name} volatile * {peripheral.name.upper()};\n"
+                t = Template(templates.peripheral.declaration)
+                s = t.substitute(
+                    Device=device, peripheral=peripheral, templates=templates
                 )
+                h.write(s)
             h.write("\n")
 
 

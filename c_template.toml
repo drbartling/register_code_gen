@@ -14,19 +14,19 @@ top = '''
 #define ${device.name}_H_
 
 #ifdef __cplusplus
-extern "C" {{
+extern "C" {
 #endif
 
 '''
 
 [peripheral]
 declaration = '''
-extern  volatile * {peripheral.name};
+extern ${templates.peripheral.type} volatile * ${peripheral.name.upper()};
 '''
 definition = '''
-{peripheral.name.upper()}_peripheral_registers_t volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.base_address:08X}UL);
+{type_name} volatile * {peripheral.name.upper()} = (void *) (0x{peripheral.base_address:08X}UL);
 '''
 include = '''
 #include "${device.name.lower()}\${peripheral.name.lower()}.h"
 '''
-type = '${peripheral.name.upper()}_peripheral_registers_t'
+type = '${peripheral.derived_from.name.upper()}_peripheral_registers_t'

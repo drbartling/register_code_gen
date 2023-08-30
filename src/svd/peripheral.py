@@ -34,7 +34,7 @@ class Peripheral:
     interrupt: Optional[List["Interrupt"]] = None
     registers: Optional[List[Register]] = None
 
-    derived_from: Optional[Union[str, "Peripheral"]] = None
+    _derived_from: Optional[Union[str, "Peripheral"]] = None
     parent: Optional[Any] = None
 
     @classmethod
@@ -76,7 +76,7 @@ class Peripheral:
                     "reset_mask", parent.reset_mask if parent else None
                 )
             ),
-            derived_from=peripheral_dict.get("@derivedFrom"),
+            _derived_from=peripheral_dict.get("@derivedFrom"),
             parent=parent,
         )
 
@@ -90,6 +90,14 @@ class Peripheral:
         new_cls.registers = registers
 
         return new_cls
+
+    @property
+    def derived_from(self):
+        return self._derived_from or self
+
+    @derived_from.setter
+    def derived_from(self, value):
+        self._derived_from = value
 
 
 @dataclass

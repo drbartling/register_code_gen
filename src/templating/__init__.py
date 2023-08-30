@@ -1,12 +1,10 @@
 import collections
-import functools
+import logging
 import re
 from collections import namedtuple
-from copy import deepcopy
-from enum import Enum
-from string import Template as PyTemplate
 from typing import Any
 
+_logger = logging.getLogger(__name__)
 _sentinel_dict = {}
 
 
@@ -33,16 +31,25 @@ class Template:
 
             if expression := match_object.group("braced"):
                 f_string = rf'f"{{mapping.{expression}}}"'
-                return eval(f_string)  # pylint: disable=eval-used
+                try:
+                    return eval(f_string)  # pylint: disable=eval-used
+                except Exception:
+                    _logger.error("Failed to evaluate %s", f_string)
+                    raise
+
             if expression := match_object.group("escaped"):
                 return "$"
             if expression := match_object.group("invalid"):
                 return match_object.group()
-            raise LookupError(
-                f"Unexpected match group in {match_object.group()}"
-            )
+            return match_object.group()
 
-        return self.pattern.sub(convert, self.template)
+        result = None
+        template = self.template
+        while result != template:
+            template = result or self.template
+            result = self.pattern.sub(convert, template)
+
+        return result
 
     def safe_substitute(self, __mapping=_sentinel_dict, /, **kwds) -> str:
         # Using the fact that a default dict is a fixed object to detect if an
@@ -65,11 +72,15 @@ class Template:
                 return "$"
             if expression := match_object.group("invalid"):
                 return match_object.group()
-            raise LookupError(
-                f"Unexpected match group in {match_object.group()}"
-            )
+            return match_object.group()
 
-        return self.pattern.sub(convert, self.template)
+        result = None
+        template = self.template
+        while result != template:
+            template = result or self.template
+            result = self.pattern.sub(convert, template)
+
+        return result
 
     def _mapping(self, __mapping=_sentinel_dict, /, **kwds) -> dict[str, Any]:
         assert isinstance(__mapping, dict)
