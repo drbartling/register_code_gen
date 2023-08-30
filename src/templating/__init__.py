@@ -36,11 +36,8 @@ class Template:
                 except Exception:
                     _logger.error("Failed to evaluate %s", f_string)
                     raise
-
             if expression := match_object.group("escaped"):
                 return "$"
-            if expression := match_object.group("invalid"):
-                return match_object.group()
             return match_object.group()
 
         result = None
@@ -70,8 +67,6 @@ class Template:
                     return match_object.group()
             if expression := match_object.group("escaped"):
                 return "$"
-            if expression := match_object.group("invalid"):
-                return match_object.group()
             return match_object.group()
 
         result = None

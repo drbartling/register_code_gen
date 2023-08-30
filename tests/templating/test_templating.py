@@ -32,7 +32,11 @@ template_substitute_params = [
 )
 def test_template_substitute(template_str, params, expected):
     t = Template(template_str)
+
     result = t.substitute(params)
+    assert expected == result
+
+    result = t.safe_substitute(params)
     assert expected == result
 
 

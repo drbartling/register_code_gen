@@ -29,7 +29,7 @@ show_missing = true
 [tool.coverage.run]
 branch = true
 parallel = true
-source = ["register_code_gen", "svd"]
+source = ["register_code_gen", "svd", "templating"]
 
 [tool.isort]
 line_length = 80

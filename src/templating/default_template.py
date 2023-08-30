@@ -1,3 +1,6 @@
+import tomllib
+
+_TOML_DATA = R"""
 [device]
 include = '''
 #include "${device.name.lower()}\${device.name.lower()}.h"
@@ -75,9 +78,6 @@ extern "C" {
 '''
 
 [peripheral.structure]
-bottom = '''
-} ${templates.peripheral.type};
-'''
 top = '''
 /**
 * ${peripheral.description}
@@ -85,11 +85,81 @@ top = '''
 typedef struct ${templates.peripheral.struct} {
 '''
 
+bottom = '''
+} ${templates.peripheral.type};
+'''
+
+reserved = '''
+uint8_t const reserved_0x${offset:02X}[${size}];
+'''
+
 [register]
+
 definition = '''
 ///${register.description}
 ${peripheral.name.upper()}_${register.name.lower()}_t ${register.name.lower()};
 '''
+
 offset_assert = '''
 STATIC_ASSERT_MEMBER_OFFSET(${templates.peripheral.type}, ${register.name.lower()}, 0x${register.address_offset:02X});
 '''
+size_assert = '''
+STATIC_ASSERT_TYPE_SIZE(${templates.register.type}, sizeof(uint${register.size}_t));
+'''
+type='${peripheral.name.upper()}_${register.name.lower()}_t'
+union='${peripheral.name.upper()}_${register.name.lower()}_u'
+
+[register.structure]
+top = '''
+/**
+* ${register.description}
+*/
+typedef union ${templates.register.union} {
+struct {
+'''
+
+bottom = '''
+};
+uint{register.size}_t bits;
+} ${templates.register.type};
+'''
+
+reserved = '''
+uint${register.size}_t const reserved_${offset:02}:${width};
+'''
+
+[field]
+enum_definition='''
+/// ${field.description}
+${templates.enum.type} ${const} ${field.name.lower()}:${field.bit_width};
+'''
+int_definition='''
+/// ${field.description}
+uint${register.size}_t ${const} ${field.name.lower()}:${field.bit_width};
+'''
+
+[enum]
+type='${peripheral.name.upper()}_${field.name.lower()}_t'
+enum='${peripheral.name.upper()}_${field.name.lower()}_e'
+
+value='''
+/// ${enum.description}
+${peripheral.name.upper()}_${field.name.lower()}_${enum.name.lower()} = 0x${enum.value:0X},
+'''
+
+[enum.definition]
+top='''
+/**
+* ${field.description}
+*/
+typedef enum ${templates.enum.enum} {
+'''
+
+bottom='''
+} ${templates.enum.type};
+'''
+"""
+
+
+def default_templates():
+    return tomllib.loads(_TOML_DATA)

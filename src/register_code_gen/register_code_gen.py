@@ -13,13 +13,12 @@ from svd.device import Device
 from svd.field import Field
 from svd.peripheral import Peripheral
 from svd.register import Register
-from templating import Template
+from templating import Template, default_template
 
 install()
 
-with open("c_template.toml", "rb") as toml_file:
-    templates = tomllib.load(toml_file)
-    templates = templating.named_tuple_from_dict("Templates", templates)
+# pylint: disable=invalid-name
+templates = None
 
 
 @click.command()
@@ -27,6 +26,18 @@ with open("c_template.toml", "rb") as toml_file:
     "-i",
     "--input-file",
     prompt=True,
+    type=click.Path(
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+        path_type=Path,
+    ),
+)
+@click.option(
+    "-t",
+    "--template-file",
     type=click.Path(
         exists=True,
         file_okay=True,
@@ -47,8 +58,15 @@ with open("c_template.toml", "rb") as toml_file:
         path_type=Path,
     ),
 )
-def main(input_file: Path, output_dir: Path):  # pragma: no cover
+def main(input_file: Path, template_file: Path, output_dir: Path):
     """Generate C header and dir from CMSIS-SVD which is often used to provide register descriptions for microcontrollers"""
+    global templates  # pylint: disable=global-statement
+    if template_file:
+        with template_file.open("rb") as f:
+            templates = tomllib.load(f)
+    else:
+        templates = default_template.default_templates()
+    templates = templating.named_tuple_from_dict("Templates", templates)
 
     with input_file.open("r", encoding="utf-8") as f:
         data = f.read()
@@ -109,36 +127,43 @@ class OutputStructure:
 
 def write_header(output: OutputStructure, device: Device):
     with output.main_header.open("a", encoding="utf-8") as f:
-        s = Template(templates.device.header.top).substitute(device=device)
-        f.write(s)
+        f.write(Template(templates.device.header.top).substitute(device=device))
 
 
 def write_main_source(output: OutputStructure, device: Device):
     with output.main_header.open("a", encoding="utf-8") as h:
         with output.main_source.open("a", encoding="utf-8") as c:
-            s = Template(templates.device.include).substitute(device=device)
-            c.write(s)
+            c.write(
+                Template(templates.device.include).substitute(device=device)
+            )
             c.write("\n")
             for peripheral in sorted(
                 device.peripherals,
                 key=lambda peripheral: peripheral.base_address,
             ):
-                s = Template(templates.peripheral.definition).substitute(
-                    Device=device, peripheral=peripheral, templates=templates
+                c.write(
+                    Template(templates.peripheral.definition).substitute(
+                        Device=device,
+                        peripheral=peripheral,
+                        templates=templates,
+                    )
                 )
-                c.write(s)
 
-                s = Template(templates.peripheral.declaration).substitute(
-                    Device=device, peripheral=peripheral, templates=templates
+                h.write(
+                    Template(templates.peripheral.declaration).substitute(
+                        Device=device,
+                        peripheral=peripheral,
+                        templates=templates,
+                    )
                 )
-                h.write(s)
             h.write("\n")
 
 
 def write_footer(output: OutputStructure, device: Device):
     with output.main_header.open("a", encoding="utf-8") as f:
-        s = Template(templates.device.header.bottom).substitute(device=device)
-        f.write(s)
+        f.write(
+            Template(templates.device.header.bottom).substitute(device=device)
+        )
 
 
 def write_peripherals(output: OutputStructure, device: Device):
@@ -147,13 +172,11 @@ def write_peripherals(output: OutputStructure, device: Device):
             device.peripherals, key=lambda peripheral: peripheral.name
         ):
             if p.derived_from is p:
-                include_path = output.include_dir / f"{p.name.lower()}.h"
-                include_path = include_path.relative_to(output.include_root)
-
-                s = Template(templates.peripheral.include).substitute(
-                    device=device, peripheral=p, templates=templates
+                f.write(
+                    Template(templates.peripheral.include).substitute(
+                        device=device, peripheral=p, templates=templates
+                    )
                 )
-                f.write(s)
                 write_peripheral(output, p)
         f.write("\n")
 
@@ -194,18 +217,22 @@ def write_peripheral_header(
     output: PeripheralOutputStructure, peripheral: Peripheral
 ):
     with output.header.open("w", encoding="utf-8") as f:
-        s = Template(templates.peripheral.header.top).substitute(
-            peripheral=peripheral, device=peripheral.parent
+        f.write(
+            Template(templates.peripheral.header.top).substitute(
+                peripheral=peripheral, device=peripheral.parent
+            )
         )
-        f.write(s)
 
 
 def write_peripheral_footer(output: OutputStructure, peripheral: Peripheral):
     with output.header.open("a", encoding="utf-8") as f:
-        s = Template(templates.peripheral.header.bottom).substitute(
-            peripheral=peripheral, templates=templates, device=peripheral.parent
+        f.write(
+            Template(templates.peripheral.header.bottom).substitute(
+                peripheral=peripheral,
+                templates=templates,
+                device=peripheral.parent,
+            )
         )
-        f.write(s)
 
 
 def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
@@ -217,10 +244,13 @@ def write_peripheral_registers(output: OutputStructure, peripheral: Peripheral):
 
 def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
     with output.header.open("a", encoding="utf-8") as f:
-        s = Template(templates.peripheral.structure.top).substitute(
-            peripheral=peripheral, templates=templates, device=peripheral.parent
+        f.write(
+            Template(templates.peripheral.structure.top).substitute(
+                peripheral=peripheral,
+                templates=templates,
+                device=peripheral.parent,
+            )
         )
-        f.write(s)
 
         addressed_registers = {}
         for register in peripheral.registers:
@@ -234,7 +264,9 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
             if current_offset < address:
                 reserved_bytes = int(address - current_offset)
                 f.write(
-                    f"uint8_t const reserved_0x{current_offset:02X}[{reserved_bytes}];\n"
+                    Template(
+                        templates.peripheral.structure.reserved
+                    ).substitute(offset=current_offset, size=reserved_bytes)
                 )
                 current_offset += reserved_bytes
             registers = addressed_registers[address]
@@ -244,13 +276,15 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
             for register in sorted(
                 registers, key=lambda register: register.name
             ):
-                reg_name: str = register_name(register)
-                reg_type = (
-                    f"{register.parent.name.upper()}_{reg_name.lower()}_t"
+                f.write(
+                    Template(templates.register.definition).substitute(
+                        peripheral=peripheral,
+                        templates=templates,
+                        device=peripheral.parent,
+                        register=register,
+                    )
                 )
-                if hasattr(register, "description"):
-                    f.write(f"///{register.description}\n")
-                f.write(f"{reg_type} {reg_name.lower()};\n")
+
                 current_offset = register.address_offset + int(
                     register.size / 8
                 )
@@ -258,42 +292,37 @@ def write_peripheral_struct(output: OutputStructure, peripheral: Peripheral):
             if 1 < len(registers):
                 f.write("};\n")
 
-        s = Template(templates.peripheral.structure.bottom).substitute(
-            peripheral=peripheral, templates=templates, device=peripheral.parent
-        )
-        f.write(s)
-
-        for register in sorted(
-            peripheral.registers, key=lambda register: register.address_offset
-        ):
-            s = Template(templates.register.offset_assert).substitute(
+        f.write(
+            Template(templates.peripheral.structure.bottom).substitute(
                 peripheral=peripheral,
                 templates=templates,
                 device=peripheral.parent,
-                register=register,
             )
-            f.write(s)
-
+        )
+        for register in sorted(
+            peripheral.registers, key=lambda register: register.address_offset
+        ):
+            f.write(
+                Template(templates.register.offset_assert).substitute(
+                    peripheral=peripheral,
+                    templates=templates,
+                    device=peripheral.parent,
+                    register=register,
+                )
+            )
         f.write("\n")
-
-
-def register_name(register: Register):
-    name: str = register.name
-    name = name.replace(f"{register.parent.name}_", "", 1)
-    return name
 
 
 def write_register(output: PeripheralOutputStructure, register: Register):
     write_enums(output, register)
-    reg_name: str = register_name(register)
     with output.header.open("a", encoding="utf-8") as f:
-        type_name = f"{register.parent.name.upper()}_{reg_name.lower()}_t"
-        union_name = f"{register.parent.name.upper()}_{reg_name.lower()}_u"
-        if hasattr(register, "description"):
-            f.write(f"/**\n * {register.description} \n*/\n")
-        f.write(f"typedef union {union_name} {{\n")
-        f.write("struct {\n")
-
+        f.write(
+            Template(templates.register.structure.top).substitute(
+                register=register,
+                templates=templates,
+                peripheral=register.parent,
+            )
+        )
         current_offset = 0
         for field in sorted(
             register.fields, key=lambda register: register.bit_offset
@@ -301,18 +330,24 @@ def write_register(output: PeripheralOutputStructure, register: Register):
             if current_offset < field.bit_offset:
                 reserved_offset = current_offset
                 reserved_width = field.bit_offset - reserved_offset
-                write_reserved(
-                    f, register.size, reserved_offset, reserved_width
-                )
+                write_reserved(f, register, reserved_offset, reserved_width)
                 current_offset = reserved_offset + reserved_width
             write_field(f, field)
             current_offset = field.bit_offset + field.bit_width
 
-        f.write("};\n")
-        f.write(f"uint{register.size}_t bits;\n")
-        f.write(f"}} {type_name};\n")
         f.write(
-            f"STATIC_ASSERT_TYPE_SIZE({type_name}, sizeof(uint{register.size}_t));\n"
+            Template(templates.register.structure.bottom).substitute(
+                register=register,
+                templates=templates,
+                peripheral=register.parent,
+            )
+        )
+        f.write(
+            Template(templates.register.size_assert).substitute(
+                register=register,
+                templates=templates,
+                peripheral=register.parent,
+            )
         )
         f.write("\n")
 
@@ -329,26 +364,41 @@ def write_enums(output: PeripheralOutputStructure, register: Register):
         ):
             if None is field.enumerated_values:
                 continue
-
             field_name = f"{peripheral_name}_{field.name.lower()}"
-            type_name = f"{field_name}_t"
-            enum_name = f"{field_name}_e"
-
-            if type_name in written_enums:
+            if field_name in written_enums:
                 continue
-            written_enums.add(type_name)
+            written_enums.add(field_name)
 
-            f.write(f"/**\n * {field.description}\n */\n")
-            f.write(f"typedef enum {enum_name} {{\n")
-            width = str(int(field.bit_width / 4) + 1)
+            f.write(
+                Template(templates.enum.definition.top).substitute(
+                    peripheral=register.parent,
+                    register=register,
+                    field=field,
+                    enum=field.enumerated_values,
+                    templates=templates,
+                )
+            )
 
             for enum_value in field.enumerated_values:
-                value = f"0x{enum_value.value:0{width}X}"
-                desc = enum_value.description
-                name = enum_value.name.lower()
-                f.write(f"///{desc}\n")
-                f.write(f"{field_name}_{name} = {value},\n")
-            f.write(f"}}{type_name};\n")
+                f.write(
+                    Template(templates.enum.value).substitute(
+                        peripheral=register.parent,
+                        register=register,
+                        field=field,
+                        enum=enum_value,
+                        templates=templates,
+                    )
+                )
+
+            f.write(
+                Template(templates.enum.definition.bottom).substitute(
+                    peripheral=register.parent,
+                    register=register,
+                    field=field,
+                    enum=field.enumerated_values,
+                    templates=templates,
+                )
+            )
             f.write("\n")
 
 
@@ -358,21 +408,37 @@ def write_field(f, field: Field):
     else:
         type_field = field
 
-    if type_field.enumerated_values:
-        peripheral_name = type_field.parent.parent.name
-        field_name = f"{peripheral_name}_{type_field.name.lower()}"
-        field_type = f"{field_name}_t"
-    else:
-        size = type_field.parent.size
-        field_type = f"uint{size}_t"
-
     const = "const" if field.access == Access.READ_ONLY else ""
-    f.write(f"///{field.description}\n")
-    f.write(f"{field_type} {const} {field.name.lower()}:{field.bit_width};\n")
+    if type_field.enumerated_values:
+        f.write(
+            Template(templates.field.enum_definition).substitute(
+                peripheral=field.parent.parent,
+                register=field.parent,
+                field=field,
+                enum=field.enumerated_values,
+                templates=templates,
+                const=const,
+            )
+        )
+    else:
+        f.write(
+            Template(templates.field.int_definition).substitute(
+                peripheral=field.parent.parent,
+                register=field.parent,
+                field=field,
+                enum=field.enumerated_values,
+                templates=templates,
+                const=const,
+            )
+        )
 
 
-def write_reserved(f, reg_size, offset, width):
-    f.write(f"uint{reg_size}_t const reserved_{offset:02}:{width};\n")
+def write_reserved(f, register, offset, width):
+    f.write(
+        Template(templates.register.structure.reserved).substitute(
+            register=register, offset=offset, width=width
+        )
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

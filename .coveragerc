@@ -7,6 +7,7 @@ branch = true
 parallel = true
 source =
     svd
+    templating
 
 [report]
 show_missing = true
